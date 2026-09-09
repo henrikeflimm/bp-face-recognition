@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+
+    <!-- read in js libraries -->
+    <script src="https://unpkg.com/jspsych@7.3.3"></script>
+
+    <!-- Initialize jsPsych -->
+    <script src="init-jspsych.js"></script>
+
+    <!-- read in jsPsych plugins -->
+    <script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@1.1.2"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-fullscreen@1.1.2"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-survey-html-form@1.0.3"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-survey-multi-choice@1.1.3"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-html-button-response@1.2.0"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-instructions@1.1.4"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-preload@1.1.3"></script>
+
+    <!-- Face recognition stimuli and 2AFC plugin -->
+    <script src="stimuli_fr.js"></script>
+    <script src="twoafc_plugin.js"></script>
+    <script src="runsheet_fr.js"></script>
+
+
+    <!-- read in stylesheets -->
+    <link href="https://unpkg.com/jspsych@7.3.3/css/jspsych.css" rel="stylesheet" type="text/css" />
+    <link rel="stylesheet" href="https://unpkg.com/@jspsych/plugin-survey@1.0.1/css/survey.css">
+
+    <!-- time-locking -->
+    <script src="mersenne-twister.js"></script>
+    <script src="crypto-js.min.js"></script>
+
+
+</head>
+
+</body>
+<script>
+
+    // NOTE: this hash was copied from the visual-search study (bp-vs-main) as a
+    // placeholder so the time-locking code below doesn't crash. Replace it with
+    // the correct protocol hash for THIS study once you have one.
+    const protocol_sum = "eec21e8eccbb79a618feadad5980ba194377adb9661be72f33b9662d0b92842d";
+
+    async function saveData(data, prefix) {
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', 'write_data.php'); // 'write_data.php' is the path to the php file described above.
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        if (prefix) {
+            await xhr.send(JSON.stringify({ filedata: data, prefix }));
+        } else {
+            await xhr.send(JSON.stringify({ filedata: data }));
+        }
+
+    }
+
+    var participant_id = jsPsych.randomization.randomID(10)
+
+    // capture info from Prolific
+    var subject_id = jsPsych.data.getURLVariable('PROLIFIC_PID');
+    var study_id = jsPsych.data.getURLVariable('STUDY_ID');
+    var session_id = jsPsych.data.getURLVariable('SESSION_ID');
+
+    // pick a random group for the subject at the start of the experiment
+    // (uncomment for real data collection; equal 1/2 allocation to S1, S2)
+    // var condition_assignment = jsPsych.randomization.sampleWithReplacement(['s1', 's2'], 1)[0];
+
+    // Hardcoded for testing/dev — change before data collection:
+    var condition_assignment = "s2"; // 's1' = mole rule present in faces 1-20, 's2' = present in faces 21-40
+
+    var condition_group = condition_assignment.toUpperCase(); // e.g. "S1"
+
+    jsPsych.data.addProperties({
+        subject_id: subject_id,
+        study_id: study_id,
+        session_id: session_id,
+        condition_assignment: condition_assignment,
+        condition_group: condition_group,
+        participant_id: participant_id
+    });
+
+
+
+    // define welcome message
+    var welcome = {
+        type: jsPsychHtmlKeyboardResponse,
+        stimulus: `Welcome to the experiment. Press any key to begin.`
+    };
+
+    //------------------------------------
+    // Functions to turn fullscreen on/off
+    //------------------------------------
+
+    var fullscreen_on = {
+        type: jsPsychFullscreen,
+        fullscreen_mode: true,
+        message: '<p>The experiment will switch to full screen mode when you press the button below.</p><p>Where possible, please stay in full screen mode for the entire experiment.</p>'
+    };
+
+
+    //------------------------------------
+    // Preload face images
+    //------------------------------------
+
+    var preloadTrial = {
+        type: jsPsychPreload,
+        images: function () {
+            var variants = ['both', 'no-mole'];
+            var paths = [];
+            faceIdentities.forEach(function (identity) {
+                variants.forEach(function (variant) {
+                    paths.push(faceExamplesBase + variant + '/' + identity + '.png');
+                });
+            });
+            return paths;
+        },
+        show_progress_bar: true,
+        message: '<p>Loading experiment materials...</p>'
+    };
+
+
+    //------------------------------------
+    // Instructions for the encoding phase
+    //------------------------------------
+
+    var start_exp = {
+        type: jsPsychHtmlKeyboardResponse,
+        stimulus: `
+            <p style="font-size: 20px;"><strong>You're ready to start the main task now.</strong></p>
+            <p>Remember, look carefully at each face. Each face will be shown for <strong>5 seconds</strong> before the next one appears automatically.</p>
+            <br></br>
+            <p>Press any key to begin.</p>
+            `
+    };
+
+
+    var instructions_encoding = {
+        type: jsPsychInstructions,
+        pages: [
+            `
+      <div style="display: flex; flex-direction: column; align-items: center; padding: 10px; gap: 10px; max-width: 800px; margin: auto;">
+          <div style="text-align: center; width: 100%; font-size: 20px;">
+            <p><strong>Face Memory Task</strong></p>
+          </div>
+          <div style="text-align: left; width: 100%;">
+            <p>In this experiment, you will see a series of <strong>faces</strong>, one at a time.</p>
+            <p>Please look at each face <strong>carefully</strong>, because later on we will ask you questions about the faces you saw. Try to memorise the faces, with all their details, as best as you can.</p>
+            <p>Note that some faces might <strong>look similar</strong> to one another, but each face belongs to a <strong>different individual</strong> — we will never show you the same person twice.</p>
+            <p>Each face will be shown for <strong>5 seconds</strong>, and then the next face will appear automatically.</p>
+          </div>
+      </div>
+    `,
+            `
+      <div style="display: flex; flex-direction: column; align-items: center; padding: 10px; gap: 10px; max-width: 800px; margin: auto;">
+          <div style="text-align: center; width: 100%; font-size: 20px;">
+            <p><strong>Face Memory Task</strong></p>
+          </div>
+          <div style="text-align: left; width: 100%;">
+            <p>Each face appears for exactly <strong>5 seconds</strong> and then moves on automatically, so please pay close attention the moment it appears.</p>
+            <p>You will see <strong>40 faces</strong> in total.</p>
+          </div>
+      </div>
+    `,
+            `
+      <div style="display: flex; flex-direction: column; align-items: center; padding: 10px; gap: 10px; max-width: 800px; margin: auto;">
+          <div style="text-align: center; width: 100%; font-size: 20px;">
+            <p><strong>Face Memory Task</strong></p>
+          </div>
+          <div style="text-align: left; width: 100%;">
+            <p>After you have seen all the faces, we will test your <strong>memory</strong> for them. For each face, you will see two slightly different versions of it side by side, and you will choose the one you actually saw, then rate how confident you are.</p>
+          </div>
+      </div>
+      `
+        ],
+        show_clickable_nav: true,  // Enables navigation buttons
+        button_label_next: "Next",
+        button_label_previous: "Back"
+
+    };
+
+
+    //------------------------------------
+    // Comprehension check
+    //------------------------------------
+
+    var correctAnswers = {
+        goal:              'To memorise each face as best as I can while it is shown',
+        after_encoding:    'A memory test where you choose which version of each face you saw and rate your confidence',
+        n_twoafc_options:  '2',
+        after_choice:      'Rate how confident you are in your choice',
+        attention:         'Tuesday'
+    };
+
+    var baseComprehensionQuestions = [
+        {
+            prompt: 'What is your task while each face is shown?',
+            name: 'goal',
+            options: [
+                'To count how many faces are shown in total',
+                'To memorise each face as best as I can while it is shown',
+                'To rate how attractive each face is'
+            ]
+        },
+        {
+            prompt: 'What happens after you have seen all the faces?',
+            name: 'after_encoding',
+            options: [
+                'A memory test where you choose which version of each face you saw and rate your confidence',
+                'The experiment ends immediately',
+                'You are shown all the faces again in the same way as before'
+            ]
+        },
+        {
+            prompt: 'In the memory test, how many versions of each face are shown together?',
+            name: 'n_twoafc_options',
+            options: ['1', '2', '4']
+        },
+        {
+            prompt: 'What are you asked to do right after choosing an image in the memory test?',
+            name: 'after_choice',
+            options: [
+                'Rate how confident you are in your choice',
+                'Describe the face in your own words again',
+                'Nothing, the next face is shown immediately'
+            ]
+        },
+        {
+            prompt: 'Which day comes after Sunday? We are asking for the day after Sunday, not before Sunday. Please select Tuesday.',
+            name: 'attention',
+            options: ['Saturday', 'Monday', 'Tuesday']
+        }
+    ];
+
+    var comprehensionQuestions = {
+        type: jsPsychSurveyMultiChoice,
+        preamble: '<div style="text-align:center; font-family:Arial;">' +
+                  '<p style="font-size:22px; font-weight:bold;">Comprehension Check</p>' +
+                  '<p style="font-size:18px;">Please answer the following questions to confirm you understood the task.</p></div>',
+        questions: function() {
+            return jsPsych.randomization.shuffle(baseComprehensionQuestions).map(function(q, i) {
+                return {
+                    prompt: '<strong>' + (i + 1) + '.</strong> ' + q.prompt,
+                    name: q.name,
+                    options: jsPsych.randomization.shuffle(q.options.slice()),
+                    required: true
+                };
+            });
+        }
+    };
+
+    var comprehensionAttempt = 0;
+
+    var comprehensionFeedback = {
+        type: jsPsychHtmlKeyboardResponse,
+        stimulus: function() {
+            var resp = jsPsych.data.get().filter({ trial_type: 'survey-multi-choice' }).last(1).values()[0].response;
+            var nWrong = Object.keys(correctAnswers).filter(function(k) {
+                return resp[k] !== correctAnswers[k];
+            }).length;
+            if (nWrong === 0) {
+                return '<div style="text-align:center; font-family:Arial; margin-top:100px;">' +
+                       '<p style="font-size:24px; color:green; font-weight:bold;">All answers correct!</p>' +
+                       '<p style="font-size:18px; color:#555;">Press any key to begin the experiment.</p></div>';
+            } else {
+                return '<div style="text-align:center; font-family:Arial; margin-top:100px;">' +
+                       '<p style="font-size:24px; color:red; font-weight:bold;">' + nWrong + ' answer' + (nWrong > 1 ? 's were' : ' was') + ' incorrect.</p>' +
+                       '<p style="font-size:18px; color:#555;">Please re-read the instructions carefully and try again.</p>' +
+                       '<p style="font-size:18px; color:#555;">Press any key to go back to the instructions.</p></div>';
+            }
+        },
+        choices: 'ALL_KEYS'
+    };
+
+    var comprehensionLoop = {
+        timeline: [
+            {
+                timeline: [instructions_encoding],
+                conditional_function: function() { return comprehensionAttempt > 0; }
+            },
+            comprehensionQuestions,
+            comprehensionFeedback
+        ],
+        loop_function: function(data) {
+            var resp = data.filter({ trial_type: 'survey-multi-choice' }).last(1).values()[0].response;
+            var allCorrect = Object.keys(correctAnswers).every(function(k) {
+                return resp[k] === correctAnswers[k];
+            });
+            comprehensionAttempt++;
+            return !allCorrect;
+        }
+    };
+
+
+    //------------------------------------
+    // Declaration of consent
+    //------------------------------------
+
+
+    var consent = {
+        type: jsPsychHtmlButtonResponse,
+        stimulus: `
+      <div style="display: flex; flex-direction: column; align-items: center; padding: 10px; gap: 10px; max-width: 1100px; margin: auto;">
+          <div style="text-align: center; width: 100%; font-size: 20px;">
+            <p><strong>General Information and Declaration of Consent</strong></p>
+          </div>
+          <div style="text-align: left; width: 100%;">
+            <p>Thank you for your interest in our research project. Enclosed you will find information about the research project, the conditions of participation and the handling of the collected data. Please read everything carefully. If you agree and want to participate in the experiment, please confirm by giving your consent below.</p>
+            </div>
+          <div style="text-align: left; width: 100%;">
+            <p><strong>General information about the research project:</strong></p>
+            <p>This study investigates how people remember faces. The study comprises two parts and takes about 15 minutes in total. In Part 1, we will show you a series of <strong>faces</strong> one at a time. Try to memorise them, <strong>with all their details</strong>, as best as you can.  In Part 2, you will complete a short <strong>memory test</strong> in which you choose which version of each face you saw earlier and rate how confident you are in your choice. No special stress or harm is expected as a result of participating in this research project. Participation in the study is remunerated at <strong>£10 per hour</strong>, rounded up to the nearest minute. Even if you decide to withdraw from the study, you are still entitled to receive the corresponding remuneration for the time spent up to that point, provided that this can be clearly demonstrated (see section Voluntary participation).</p>
+          </div>
+          <div style="text-align: left; width: 100%;">
+            <p><strong>Voluntary participation:</strong></p>
+            <p>Your participation in this research project is <strong>voluntary</strong>. You can withdraw your consent to participate at any time and without giving reasons, without receiving any disadvantages. Even if you decide to withdraw from the study, you are still entitled to receive the corresponding remuneration for the time spent up to that point, provided that this can be clearly demonstrated.</p>
+          </div>
+          <div style="text-align: left; width: 100%;">
+            <p><strong>Participation requirements:</strong></p>
+            <p><strong>A minimum age of 18 years</strong> is required for participation. Those who have already participated in this study are excluded from participation.</p>
+          </div>
+          <div style="text-align: left; width: 100%;">
+            <p><strong>Data protection and anonymity:</strong></p>
+            <p><strong>No personal data are collected</strong> as part of this study. It is therefore not possible for us to personally identify you. As a user of Prolific, you have entered into a separate personal data processing agreement with Prolific (https://participant-help.prolific.co/hc/en-gb/articles/360021786554-Data-Protection-and-Privacy-GDPR). This agreement is independent of your consent related to this study and the personal data collected by Prolific will not be made available to the research team of this study at any point.</p>
+          </div>
+          <div style="text-align: left; width: 100%;">
+            <p><strong>Use of data:</strong></p>
+            <p>The results of this study may be published for teaching and research purposes (e.g. theses, scientific publications or conference papers). These results will be presented in anonymized form, i.e. without the data being able to be connected to a specific person. The fully anonymized data of this study will be made available as "open data" in an internet-based repository, if applicable. Thus, this study follows the recommendations of the German Research Foundation (DFG) for quality assurance with regard to verifiability and reproducibility of scientific results, as well as optimal data re-use. If you would like to receive information on the scientific results of the study after its completion, please send an e-mail to Henrike Flimm (Henrike.Flimm@psy.lmu.de).</p>
+          </div>
+          <div style="text-align: left; width: 100%;">
+            <p><strong>Legal basis and revocation:</strong></p>
+            <p>The legal basis for processing the aforementioned personal data is the consent pursuant to Art. 6 (1) letter a EU-DSGVO at the end of this document. You have the right to revoke the data protection consent at any time. The revocation does not affect the lawfulness of the processing carried out on the basis of the consent until the revocation. You can request an obligatory deletion of your data at any time - as long as you can provide sufficient information that allows us to identify your data. To do so, please contact the research project managers. You will not suffer any disadvantages as a result of the revocation.</p>
+          </div>
+          <div style="text-align: left; width: 100%;">
+            <p><strong>Research project managers:</strong></p>
+            <p>If you have any questions about the research project or if you want to exercise your right to withdraw your consent, please contact the research project managers:</p>
+            <p>Henrike Flimm: <a href="mailto:Henrike.Flimm@psy.lmu.de">Henrike.Flimm@psy.lmu.de</a><br>
+            Prof. Dr. Christopher Donkin: <a href="mailto:c.donkin@psy.lmu.de">c.donkin@psy.lmu.de</a></p>
+            <p>Ludwig-Maximilians-Universität München<br>
+            Department Psychologie<br>
+            Lehrstuhl für Computational Modeling in Psychology<br>
+            Akademiestr. 7<br>
+            80799 München</p>
+          </div>
+          <div style="text-align: left;">
+            <p><strong>Further contact addresses:</strong></p>
+            <p>You can also contact the data protection officer of the research institution or the competent supervisory authority if you have any data protection concerns in connection with this study and/or wish to lodge a complaint.</p>
+            <p>Ludwig-Maximilians-Universität München<br>
+            Behördlicher Datenschutzbeauftragter<br>
+            Geschwister-Scholl-Platz 1<br>
+            D-80539 München<br>
+            Bayerisches Landesamt für Datenschutzaufsicht<br>
+            Promenade 27<br>
+            91522 Ansbach</p>
+            <br>
+            <p>Date: September 8, 2026</p>
+            <p><strong>Declaration of consent.</strong> I hereby certify that I have read and understood the participant information described above and that I agree to the conditions stated. I agree in accordance with Art. 6 (1) letter a EU-DSGVO. I have been informed about my right to revoke my data protection consent.</p>
+            <p><strong>Declaration of fulfillment inclusion criteria.</strong> I hereby confirm that I meet the above conditions for participation (18+ years old, first-time participation).</p>
+          </div>
+      </div>
+      <style>
+        .jspsych-content {
+          padding-bottom: 100px; /* Adds space between the buttons and the bottom of the screen */
+        }
+        .jspsych-html-button-response-button {
+          margin-top: 70px; /* Adds space between the text and the buttons */
+        }
+      </style>
+    `,
+        choices: ["I consent.", "I do not consent."], // redirection if data.response == 1 !
+        button_html: '<button style="font-size: 17px; height: 50px;">%choice%</button>',
+        on_finish: function (data) {
+            // execute timeline if response == 0 ("I consent."), skip if response == 1 ("I do not consent.")
+            if (data.response == 1) {
+                jsPsych.endExperiment('<p style="width: 800px;">As you have indicated that you do <u>not</u> consent to participate in this study, please return this submission on Prolific by selecting the "<u>stop without completing</u>" button.</p><p>Thank you for your time.</p>');
+            }
+        }
+
+    };
+
+
+
+
+    //------------------------------------
+    // Save data before experiment ends
+    //------------------------------------
+
+
+    // Function to save jsPsych data as a CSV file
+    function saveDataLocally() {
+        // Get the data in CSV format
+        var csvData = jsPsych.data.get().csv();
+
+        // Create a blob from the CSV data
+        var blob = new Blob([csvData], { type: 'text/csv' });
+
+        // Create a download link
+        var fileName = `facerec_data${participant_id}_${condition_group}.csv`;
+        var url = window.URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        a.click(); // Simulate a click to start the download
+        window.URL.revokeObjectURL(url); // Clean up URL object
+    }
+
+    // Example: Add this to your experiment's timeline to provide a download option
+    var downloadData = {
+        type: jsPsychHtmlButtonResponse,
+        stimulus: '<p>Thank you for participating! Click below to download your data.</p>',
+        choices: ['Download Data'],
+        on_finish: function () {
+            saveDataLocally();
+        }
+    };
+
+
+
+
+
+    //------------------------------------
+    // Put it all in a timeline
+    //------------------------------------
+
+    function makeTimeline() {
+    var timeline = [
+        welcome,
+        fullscreen_on,
+        consent,
+        preloadTrial,
+        instructions_encoding,
+        comprehensionLoop,
+        start_exp
+    ];
+
+    // Main encoding phase: 40 faces
+    timeline = timeline.concat(encodingTrialTimeline);
+
+    // Memory test phase: same order as encoding
+    timeline.push(twoafcInstruction);
+    timeline = timeline.concat(twoafcTrialTimeline);
+
+
+    // Debrief page 1: tell them a rule existed (not what it was), ask them to describe it
+    timeline.push({
+        type: jsPsychSurveyHtmlForm,
+        preamble: '<div style="max-width:800px; margin:60px auto; font-family:Arial; font-size:19px; line-height:1.7; text-align:left;">'
+            + '<p style="font-size:24px; font-weight:bold; text-align:center;">Debriefing</p>'
+            + '<p>Thank you for completing the experiment!</p>'
+            + '<p>While you were looking at the faces in the first part of the experiment, there was a <strong>hidden regularity</strong> — a detail that many of the faces had in common.</p>'
+            + '<p><strong>What do you think this detail was?</strong> Please describe it in your own words. '
+            + 'If you did not notice any regularity, enter <strong>N</strong>.</p>'
+            + '<p style="color:#555;">Please answer honestly — there are no negative consequences if you did not notice the regularity.</p>'
+            + '</div>',
+        html: '<div style="max-width:800px; margin:0 auto; font-family:Arial; font-size:19px;">'
+            + '<textarea id="rule_description" name="rule_description" required rows="4" '
+            + 'style="width:100%; font-size:18px; padding:10px; box-sizing:border-box;" '
+            + 'placeholder="Describe the detail, or enter N if you did not notice anything."></textarea>'
+            + '</div>',
+        button_label: 'Continue',
+        data: { trial_id: 'debrief_rule_description' }
+    });
+
+    // Debrief page 2: reveal what the rule was, ask when they noticed it
+    timeline.push({
+        type: jsPsychSurveyHtmlForm,
+        preamble: function() {
+            return '<div style="max-width:800px; margin:60px auto; font-family:Arial; font-size:19px; line-height:1.7; text-align:left;">'
+                + '<p>The detail was: the faces ' + ruleFeatureDescription() + '.</p>'
+                + '<p>The memory task at the end of the experiment was designed to find out whether you noticed this. We also want to ask you directly:</p>'
+                + '<p><strong>When did you first notice that the faces had at least one mole (in Part 1)?</strong> Please estimate the face number '
+                + 'at which you first became aware of it (1–40). '
+                + 'If you did not notice it, enter <strong>N</strong>.</p>'
+                + '<p style="color:#555;">Please answer honestly — there are no negative consequences if you did not notice the pattern.</p>'
+                + '</div>';
+        },
+        html: '<div style="max-width:800px; margin:0 auto; font-family:Arial; font-size:19px;">'
+            + '<table style="margin:0 auto; border-spacing:16px;">'
+            + '<tr>'
+            + '<td style="text-align:right;"><label for="noticed_face">Face number (1–40 or N):</label></td>'
+            + '<td><input type="text" id="noticed_face" name="noticed_face" required '
+            + 'pattern="^([1-9]|[1-2][0-9]|3[0-9]|40|[Nn])$" title="Enter a number between 1 and 40, or N if you did not notice the pattern." '
+            + 'style="font-size:18px; width:80px; padding:6px; text-align:center;"></td>'
+            + '</tr>'
+            + '</table>'
+            + '</div>',
+        button_label: 'Continue',
+        data: { trial_id: 'debrief_noticed_when' }
+    });
+
+    // Debrief page 3: reveal which half had the rule, ask if they noticed the change
+    timeline.push({
+        type: jsPsychHtmlButtonResponse,
+        stimulus: function() {
+            var regularHalf = condition_assignment === 's1' ? 'faces 1–20' : 'faces 21–40';
+            var randomHalf   = condition_assignment === 's1' ? 'faces 21–40' : 'faces 1–20';
+            var half         = condition_assignment === 's1' ? 'first half (faces 1–20)' : 'second half (faces 21–40)';
+
+            return '<div style="max-width:800px; margin:60px auto; font-family:Arial; font-size:19px; line-height:1.7; text-align:left;">'
+                + '<p>In your case, the regularity was present only in the <strong>' + half + '</strong> of the experiment. '
+                + 'Specifically, this means that <strong>' + regularHalf + '</strong> had at least one mole,'
+                + 'while <strong>' + randomHalf + '</strong> were mole-free.</p>'
+                + '<p>Did you notice that the regularity changed halfway through the experiment?</p>'
+                + '<p style="color:#555;">Please answer honestly — there are no negative consequences if you did not notice the change.</p>'
+                + '</div>';
+        },
+        choices: ['Yes', 'No'],
+        button_html: '<button class="jspsych-btn" style="font-size:17px; padding:12px 40px; margin:8px;">%choice%</button>',
+        data: { trial_id: 'debrief_noticed_change' }
+    });
+
+    timeline.push({
+        type: jsPsychHtmlKeyboardResponse,
+        fullscreen_mode: true,
+        on_finish: async function () {
+            await saveData(jsPsych.data.get().csv(), null);
+        },
+        stimulus: '<span style="display: flex;flex-direction: column;text-align: left;width: 50vw;">'
+            + '<p>Thanks for your participation. Press any key to save the data and end the experiment.</p>',
+        choices: "ALL_KEYS"
+    });
+
+    timeline.push({
+        type: jsPsychHtmlKeyboardResponse,
+        fullscreen_mode: true,
+        stimulus: '<span style="display: flex;flex-direction: column;text-align: left;width: 50vw;">'
+            + '<h3>Your redirect link is:<a target="_blank" href="https://app.prolific.com/submissions/complete?cc=C1I5XMZP">https://app.prolific.com/submissions/complete?cc=C1I5XMZP</a></h3>'
+            + '<h3>Your redirect code for prolific is C1I5XMZP.</h3>'
+            + '<p>Now you can end the experiment.</p>',
+        choices: ""
+    });
+
+
+    return timeline;
+    } // end makeTimeline()
+
+    // execute timeline.
+    var m = new MersenneTwister();
+    Math.random = function() { return m.random(); };
+    var subject_identifier = jsPsych.data.getURLVariable('PROLIFIC_PID');
+    subject_sum = hexToBytes(
+        CryptoJS.SHA256(protocol_sum + subject_identifier).toString()
+    );
+    m.init_by_array(subject_sum, subject_sum.length);
+    jsPsych.data.addProperties({
+        'protocol_sum': protocol_sum,
+        'subject_identifier': subject_identifier,
+        'subject_sum': subject_sum
+    });
+    buildFaceExperimentTimeline();
+    timeline = makeTimeline();
+    jsPsych.run(timeline);
+
+
+    function hexToBytes(hex) {
+    for (var bytes = [], c = 0; c < hex.length; c += 2)
+        bytes.push(parseInt(hex.substr(c, 2), 16));
+    return bytes;
+    }
+
+
+
+</script>
+
+</html>
