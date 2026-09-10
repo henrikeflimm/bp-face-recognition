@@ -1,16 +1,18 @@
 // Runsheet for the face recognition task.
 //
-// 40 encoding trials (participants view each face for 5 seconds, no response
-// required), followed by 40 two-alternative-forced-choice (2AFC) memory
-// trials in the same order.
+// 40 encoding trials (participants view each face for 3 seconds; they must
+// press the spacebar if the face has ginger hair, an in-task attention
+// check), followed by 40 two-alternative-forced-choice (2AFC) memory trials
+// in the same order.
 //
 // Two between-subject groups, set via a global defined in index.html:
 //   condition_assignment: 's1' (mole rule in trials 1-20) | 's2' (mole rule in trials 21-40)
 //
 // Rule-half images ALWAYS carry a mole; non-rule-half images NEVER do.
 //
-// Depends on globals from stimuli_fr.js (faceIdentities, facePath) and on
-// jsPsych / jsPsychHtmlKeyboardResponse / jsPsychTwoAFC being available.
+// Depends on globals from stimuli_fr.js (faceIdentities, facePath,
+// gingerHairIdentities) and on jsPsych / jsPsychHtmlKeyboardResponse /
+// jsPsychTwoAFC being available.
 
 var N_MAIN = 40;
 var RULE_HALF_SIZE = 20;
@@ -41,10 +43,11 @@ function ruleFeatureDescription() {
 // ── Encoding trial ────────────────────────────────────────────────────────────
 
 var ENCODING_IMG_ID = 'encoding-face-img';
-var ENCODING_DURATION_MS = 5000;
+var ENCODING_DURATION_MS = 3000;
 
 function makeEncodingTrial(identity, hasMole, trialNum, totalTrials) {
     var imgSrc = facePath(identity, hasMole);
+    var hasGingerHair = gingerHairIdentities.indexOf(identity) !== -1;
     return {
         type: jsPsychHtmlKeyboardResponse,
         stimulus: function () {
@@ -54,14 +57,23 @@ function makeEncodingTrial(identity, hasMole, trialNum, totalTrials) {
                 '<img id="' + ENCODING_IMG_ID + '" src="' + imgSrc + '" style="width:500px; border-radius:8px; border:1px solid #ccc;" />' +
                 '</div>';
         },
-        choices: 'NO_KEYS',
+        choices: [' '],
+        response_ends_trial: false, // keep showing the face for the full duration even if the spacebar is pressed
         trial_duration: ENCODING_DURATION_MS,
         data: {
             trial_id: 'encoding',
             trial_num: trialNum,
             identity: identity,
             has_mole: hasMole,
+            has_ginger_hair: hasGingerHair,
             rule_active: isRuleHalf(trialNum)
+        },
+        on_finish: function (data) {
+            // jsPsych's html-keyboard-response plugin already stores the raw
+            // key ('response') and reaction time ('rt'); derive clearer fields.
+            data.spacebar_pressed = data.response !== null;
+            data.spacebar_rt = data.rt;
+            data.attention_correct = (data.spacebar_pressed === hasGingerHair);
         }
     };
 }

@@ -24,7 +24,6 @@ var faceIdentities = [
     'eur-20s-bllsbun-2',
     'eur-20s-bssleekbun',
     'eur-30s-lbraids',
-    'eur-50s-glheadband-1',
     'eur-50s-glheadband-2',
     'eur-50s-lgdown',
     'ind-20s-braiddls-1',
@@ -49,11 +48,19 @@ var faceIdentities = [
     'scand-40s-blols',
     'scand-40s-grbob-2',
     'sea-20s-ls-2',
-    'sea-30s-blbraids-1'
-    // NOTE: only 40 identities are needed for the main task. Add more
-    // filenames here (and matching files in face-examples/both/ and
-    // face-examples/no-mole/) if you want to rotate stimulus sets or
-    // replace any of these.
+    'sea-30s-blbraids-1',
+    'sea-40s-shs-1'
+    // NOTE: exactly 40 identities are needed for the main task, matching
+    // all images that exist in face-examples/both/ and face-examples/no-mole/.
+];
+
+// Identities with ginger hair — the target for the spacebar attention check
+// during encoding. Ginger-hair status is a property of the identity itself
+// (hair colour doesn't change between the mole/no-mole variants).
+var gingerHairIdentities = [
+    'scand-30s-gcbun',
+    'balk-20s-lgheadband',
+    'am-20s-gssleekponytail'
 ];
 
 // Path to a specific identity/mole-variant image.

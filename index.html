@@ -129,7 +129,8 @@
         type: jsPsychHtmlKeyboardResponse,
         stimulus: `
             <p style="font-size: 20px;"><strong>You're ready to start the main task now.</strong></p>
-            <p>Remember, look carefully at each face. Each face will be shown for <strong>5 seconds</strong> before the next one appears automatically.</p>
+            <p>Remember, look carefully at each face. Each face will be shown for <strong>3 seconds</strong> before the next one appears automatically.</p>
+            <p>Remember to press the <strong>spacebar</strong> whenever you see a face with <strong>ginger hair</strong>.</p>
             <br></br>
             <p>Press any key to begin.</p>
             `
@@ -148,7 +149,7 @@
             <p>In this experiment, you will see a series of <strong>faces</strong>, one at a time.</p>
             <p>Please look at each face <strong>carefully</strong>, because later on we will ask you questions about the faces you saw. Try to memorise the faces, with all their details, as best as you can.</p>
             <p>Note that some faces might <strong>look similar</strong> to one another, but each face belongs to a <strong>different individual</strong> — we will never show you the same person twice.</p>
-            <p>Each face will be shown for <strong>5 seconds</strong>, and then the next face will appear automatically.</p>
+            <p>Each face will be shown for <strong>3 seconds</strong>, and then the next face will appear automatically.</p>
           </div>
       </div>
     `,
@@ -158,7 +159,8 @@
             <p><strong>Face Memory Task</strong></p>
           </div>
           <div style="text-align: left; width: 100%;">
-            <p>Each face appears for exactly <strong>5 seconds</strong> and then moves on automatically, so please pay close attention the moment it appears.</p>
+            <p>Each face appears for exactly <strong>3 seconds</strong> and then moves on automatically, so please pay close attention the moment it appears.</p>
+            <p>While the faces are shown, please also press the <strong>spacebar</strong> whenever you see a face with <strong>ginger hair</strong>. This will happen for a few of the faces.</p>
             <p>You will see <strong>40 faces</strong> in total.</p>
           </div>
       </div>
@@ -187,10 +189,10 @@
 
     var correctAnswers = {
         goal:              'To memorise each face as best as I can while it is shown',
+        ginger_task:       'Press the spacebar',
         after_encoding:    'A memory test where you choose which version of each face you saw and rate your confidence',
         n_twoafc_options:  '2',
-        after_choice:      'Rate how confident you are in your choice',
-        attention:         'Tuesday'
+        after_choice:      'Rate how confident you are in your choice'
     };
 
     var baseComprehensionQuestions = [
@@ -201,6 +203,15 @@
                 'To count how many faces are shown in total',
                 'To memorise each face as best as I can while it is shown',
                 'To rate how attractive each face is'
+            ]
+        },
+        {
+            prompt: 'What should you do if you see a face with ginger hair?',
+            name: 'ginger_task',
+            options: [
+                'Press the spacebar',
+                'Click on the face',
+                'Nothing special, just continue as normal'
             ]
         },
         {
@@ -225,11 +236,6 @@
                 'Describe the face in your own words again',
                 'Nothing, the next face is shown immediately'
             ]
-        },
-        {
-            prompt: 'Which day comes after Sunday? We are asking for the day after Sunday, not before Sunday. Please select Tuesday.',
-            name: 'attention',
-            options: ['Saturday', 'Monday', 'Tuesday']
         }
     ];
 
